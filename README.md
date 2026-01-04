@@ -1,6 +1,8 @@
 # Simple Hashmap Implementation in C
 
-A simple, truly generic hashmap implementation in C that mimics the functionality of `std::unordered_map` from C++.
+A simple, truly generic **header-only** hashmap implementation in C that mimics the functionality of `std::unordered_map` from C++.
+
+**Header-Only**: Just `#include "hashmap.h"` - no separate compilation needed!
 
 ## Features
 
@@ -39,8 +41,14 @@ hashmap_t *hashmap_create(
 
 ## Building
 
+Since this is a header-only implementation, you can simply include `hashmap.h` in your code. No separate compilation needed!
+
 ```bash
+# Build example
 make
+
+# Or just compile directly:
+gcc -o my_program my_program.c
 ```
 
 ## Running Example
