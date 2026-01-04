@@ -1,5 +1,5 @@
-#ifndef HASHMAP_SIMPLE_H
-#define HASHMAP_SIMPLE_H
+#ifndef HASHMAP_H
+#define HASHMAP_H
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -56,5 +56,5 @@ bool hashmap_is_empty(const hashmap_t *map);
 // Clear all entries from the hashmap
 void hashmap_clear(hashmap_t *map);
 
-#endif // HASHMAP_SIMPLE_H
+#endif // HASHMAP_H
 
