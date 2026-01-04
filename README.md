@@ -5,7 +5,9 @@ A simple hashmap implementation in C that mimics the functionality of `std::map`
 ## Features
 
 - **Generic key-value storage**: Works with any pointer type (keys can be binary data, not just strings)
-- **Required hash and comparison functions**: Ensures type safety - no assumptions about key format
+- **Two creation modes**:
+  - Custom hash/compare functions (full control)
+  - Generic key-size mode (no custom functions needed for fixed-size types!)
 - **Helper functions provided**: For strings, integers, and pointers
 - **Automatic resizing**: Grows when load factor exceeds 0.75
 - **Collision handling**: Uses separate chaining
@@ -26,11 +28,32 @@ hashmap_t *hashmap_create(
 );
 ```
 
-**Note**: `hash_func` and `key_compare` are **required** and cannot be NULL. This ensures the hashmap works correctly with any key type, including binary data. Use the helper functions below for common cases.
+**Note**: `hash_func` and `key_compare` are **required** and cannot be NULL when using `hashmap_create()`. This ensures the hashmap works correctly with any key type, including binary data. 
+
+**Alternative**: For fixed-size key types (int, structs, binary data), you can use `hashmap_create_with_key_size()` instead - no custom functions needed!
+
+### Generic Key-Size Mode (Recommended for Fixed-Size Types)
+
+For fixed-size key types (integers, structs, binary data), you can use `hashmap_create_with_key_size()` which automatically handles hashing and comparison using byte-wise operations. **No custom functions needed!**
+
+```c
+hashmap_t *hashmap_create_with_key_size(
+    size_t initial_capacity,
+    size_t key_size,        // Size of key in bytes (e.g., sizeof(int), sizeof(my_struct))
+    key_free_func_t key_free,
+    value_free_func_t value_free
+);
+```
+
+This uses the FNV-1a hash algorithm and `memcmp` for comparison, making it perfect for:
+- Integers (`sizeof(int)`)
+- Structs (`sizeof(my_struct)`)
+- Fixed-size binary data
+- Any type where keys have a fixed size
 
 ### Helper Functions
 
-The library provides helper functions for common key types:
+For variable-length keys (like strings) or when you need custom behavior, the library provides helper functions:
 
 **Hash functions:**
 - `hashmap_string_hash()` - For null-terminated C strings
@@ -42,7 +65,7 @@ The library provides helper functions for common key types:
 - `hashmap_int_compare()` - For integer keys
 - `hashmap_ptr_compare()` - For pointer keys
 
-For binary data or custom types, you must provide your own hash and comparison functions.
+For custom types with special requirements, you can provide your own hash and comparison functions.
 
 ### Operations
 
@@ -69,6 +92,26 @@ make
 
 ## Usage Examples
 
+### Generic Key-Size Mode (Easiest for Fixed-Size Types!)
+
+```c
+// For integers - no custom functions needed!
+hashmap_t *map = hashmap_create_with_key_size(16, sizeof(int), NULL, NULL);
+int key = 42;
+int value = 100;
+hashmap_put(map, &key, &value);
+int *result = (int *)hashmap_get(map, &key);
+hashmap_destroy(map);
+
+// For structs - also no custom functions needed!
+typedef struct { int x; int y; } point_t;
+hashmap_t *point_map = hashmap_create_with_key_size(16, sizeof(point_t), NULL, NULL);
+point_t p = {1, 2};
+hashmap_put(point_map, &p, "origin");
+char *label = (char *)hashmap_get(point_map, &p);
+hashmap_destroy(point_map);
+```
+
 ### String Keys (Using Helper Functions)
 
 ```c
@@ -78,7 +121,7 @@ char *value = (char *)hashmap_get(map, "key1");
 hashmap_destroy(map);
 ```
 
-### Integer Keys (Using Helper Functions)
+### Integer Keys (Using Helper Functions - Alternative to key_size mode)
 
 ```c
 hashmap_t *map = hashmap_create(16, hashmap_int_hash, hashmap_int_compare, NULL, NULL);
@@ -100,12 +143,22 @@ hashmap_put(map, key, val);
 hashmap_destroy(map);
 ```
 
-### Binary Data Keys (Custom Functions)
+### Binary Data Keys
 
-For binary data, you must provide custom hash and comparison functions:
+For fixed-size binary data, use `hashmap_create_with_key_size()`:
 
 ```c
-// Hash function for binary data of known size
+// For 16-byte binary keys - no custom functions needed!
+hashmap_t *map = hashmap_create_with_key_size(16, 16, NULL, NULL);
+uint8_t key[16] = {0x01, 0x02, ...};
+hashmap_put(map, key, value);
+hashmap_destroy(map);
+```
+
+For variable-length binary data or special requirements, provide custom functions:
+
+```c
+// Custom hash function for variable-length binary data
 size_t binary_hash(const void *key) {
     const uint8_t *data = (const uint8_t *)key;
     size_t hash = 5381;
@@ -121,9 +174,6 @@ int binary_compare(const void *key1, const void *key2) {
 }
 
 hashmap_t *map = hashmap_create(16, binary_hash, binary_compare, NULL, NULL);
-uint8_t key[16] = {0x01, 0x02, ...};
-hashmap_put(map, key, value);
-hashmap_destroy(map);
 ```
 
 ## Implementation Details

@@ -28,6 +28,20 @@ hashmap_t *hashmap_create(
     value_free_func_t value_free
 );
 
+// Create a new hashmap with generic byte-wise hashing and comparison
+// This is convenient for fixed-size key types (int, structs, binary data, etc.)
+// initial_capacity: initial number of buckets (must be > 0)
+// key_size: size of each key in bytes (must be > 0)
+// key_free: function to free keys (NULL for no cleanup)
+// value_free: function to free values (NULL for no cleanup)
+// Returns NULL on failure
+hashmap_t *hashmap_create_with_key_size(
+    size_t initial_capacity,
+    size_t key_size,
+    key_free_func_t key_free,
+    value_free_func_t value_free
+);
+
 // Destroy the hashmap and free all resources
 void hashmap_destroy(hashmap_t *map);
 
