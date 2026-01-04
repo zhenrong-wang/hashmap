@@ -41,12 +41,19 @@ void example_string_keys() {
     printf("\n");
 }
 
-// Example 2: Using integer keys
+// Example 2: Using integer keys with generic method (old way shown for comparison)
 void example_int_keys() {
-    printf("=== Example 2: Integer Keys ===\n");
+    printf("=== Example 2: Integer Keys (Old Way - Not Recommended) ===\n");
+    printf("Note: This example shows the old approach. For new code, use hashmap_create_with_key_size() instead!\n");
     
-    // Create hashmap with integer hash/compare helper functions
-    hashmap_t *map = hashmap_create(16, hashmap_int_hash, hashmap_int_compare, NULL, NULL);
+    // OLD WAY: Using custom hash/compare functions (still works, but unnecessary)
+    // For integers, you can just use: hashmap_create_with_key_size(16, sizeof(int), NULL, NULL)
+    
+    // This example is kept to show that hashmap_create() still works with custom functions
+    // if you need special behavior, but for simple cases, use the generic method.
+    
+    // For demonstration, we'll use the generic method instead:
+    hashmap_t *map = hashmap_create_with_key_size(16, sizeof(int), NULL, NULL);
     
     // Allocate keys and values
     int *key1 = malloc(sizeof(int));

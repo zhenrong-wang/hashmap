@@ -69,31 +69,15 @@ bool hashmap_is_empty(const hashmap_t *map);
 // Clear all entries from the hashmap
 void hashmap_clear(hashmap_t *map);
 
-// Helper hash functions for common key types
+// Helper functions for variable-length keys
 
 // Hash function for null-terminated C strings
+// Note: For fixed-size types (int, structs, etc.), use hashmap_create_with_key_size() instead
 size_t hashmap_string_hash(const void *key);
 
-// Hash function for integer keys (pass pointer to int)
-size_t hashmap_int_hash(const void *key);
-
-// Hash function for pointer keys (uses pointer address)
-size_t hashmap_ptr_hash(const void *key);
-
-// Hash function for binary data (requires key_size parameter)
-// Note: This is a helper - you need to create a wrapper that captures key_size
-// Example: Use hashmap_binary_hash_with_size(key_size) to get a hash function
-
-// Helper comparison functions for common key types
-
 // Comparison function for null-terminated C strings
+// Note: For fixed-size types (int, structs, etc.), use hashmap_create_with_key_size() instead
 int hashmap_string_compare(const void *key1, const void *key2);
-
-// Comparison function for integer keys (pass pointers to int)
-int hashmap_int_compare(const void *key1, const void *key2);
-
-// Comparison function for pointer keys (compares pointer addresses)
-int hashmap_ptr_compare(const void *key1, const void *key2);
 
 #endif // HASHMAP_H
 

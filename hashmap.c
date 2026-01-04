@@ -33,45 +33,9 @@ size_t hashmap_string_hash(const void *key) {
     return hash;
 }
 
-// Helper hash function for integer keys
-size_t hashmap_int_hash(const void *key) {
-    const int *k = (const int *)key;
-    // Simple hash for integers
-    size_t h = (size_t)(*k);
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-    return h;
-}
-
-// Helper hash function for pointer keys
-size_t hashmap_ptr_hash(const void *key) {
-    // Hash the pointer address
-    uintptr_t ptr = (uintptr_t)key;
-    return (size_t)(ptr ^ (ptr >> 16));
-}
-
 // Helper comparison function for null-terminated C strings
 int hashmap_string_compare(const void *key1, const void *key2) {
     return strcmp((const char *)key1, (const char *)key2);
-}
-
-// Helper comparison function for integer keys
-int hashmap_int_compare(const void *key1, const void *key2) {
-    const int *k1 = (const int *)key1;
-    const int *k2 = (const int *)key2;
-    if (*k1 < *k2) return -1;
-    if (*k1 > *k2) return 1;
-    return 0;
-}
-
-// Helper comparison function for pointer keys
-int hashmap_ptr_compare(const void *key1, const void *key2) {
-    if (key1 < key2) return -1;
-    if (key1 > key2) return 1;
-    return 0;
 }
 
 // Generic byte-wise hash function (FNV-1a algorithm)

@@ -53,19 +53,14 @@ This uses the FNV-1a hash algorithm and `memcmp` for comparison, making it perfe
 
 ### Helper Functions
 
-For variable-length keys (like strings) or when you need custom behavior, the library provides helper functions:
+**Only for variable-length keys**: The library provides helper functions for null-terminated C strings:
 
-**Hash functions:**
-- `hashmap_string_hash()` - For null-terminated C strings
-- `hashmap_int_hash()` - For integer keys (pass pointer to int)
-- `hashmap_ptr_hash()` - For pointer keys
+- `hashmap_string_hash()` - Hash function for strings
+- `hashmap_string_compare()` - Comparison function for strings
 
-**Comparison functions:**
-- `hashmap_string_compare()` - For null-terminated C strings
-- `hashmap_int_compare()` - For integer keys
-- `hashmap_ptr_compare()` - For pointer keys
+**Why only strings?** The generic `hashmap_create_with_key_size()` method handles all fixed-size types (int, structs, pointers, binary data). Strings are special because they're variable-length (null-terminated), so they need special handling.
 
-For custom types with special requirements, you can provide your own hash and comparison functions.
+For custom types with special requirements, you can provide your own hash and comparison functions using `hashmap_create()`.
 
 ### Operations
 
@@ -121,10 +116,12 @@ char *value = (char *)hashmap_get(map, "key1");
 hashmap_destroy(map);
 ```
 
-### Integer Keys (Using Helper Functions - Alternative to key_size mode)
+### Integer Keys
+
+**Use the generic method** - no helper functions needed:
 
 ```c
-hashmap_t *map = hashmap_create(16, hashmap_int_hash, hashmap_int_compare, NULL, NULL);
+hashmap_t *map = hashmap_create_with_key_size(16, sizeof(int), NULL, NULL);
 int key = 42;
 int value = 100;
 hashmap_put(map, &key, &value);
