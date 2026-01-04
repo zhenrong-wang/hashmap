@@ -21,8 +21,8 @@ struct hashmap {
     value_free_func_t value_free;
 };
 
-// Default hash function (djb2 algorithm for strings)
-size_t hashmap_default_hash(const void *key) {
+// Helper hash function for null-terminated C strings (djb2 algorithm)
+size_t hashmap_string_hash(const void *key) {
     const char *str = (const char *)key;
     size_t hash = 5381;
     int c;
@@ -32,9 +32,45 @@ size_t hashmap_default_hash(const void *key) {
     return hash;
 }
 
-// Default key comparison function for strings
-int hashmap_default_key_compare(const void *key1, const void *key2) {
+// Helper hash function for integer keys
+size_t hashmap_int_hash(const void *key) {
+    const int *k = (const int *)key;
+    // Simple hash for integers
+    size_t h = (size_t)(*k);
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    return h;
+}
+
+// Helper hash function for pointer keys
+size_t hashmap_ptr_hash(const void *key) {
+    // Hash the pointer address
+    uintptr_t ptr = (uintptr_t)key;
+    return (size_t)(ptr ^ (ptr >> 16));
+}
+
+// Helper comparison function for null-terminated C strings
+int hashmap_string_compare(const void *key1, const void *key2) {
     return strcmp((const char *)key1, (const char *)key2);
+}
+
+// Helper comparison function for integer keys
+int hashmap_int_compare(const void *key1, const void *key2) {
+    const int *k1 = (const int *)key1;
+    const int *k2 = (const int *)key2;
+    if (*k1 < *k2) return -1;
+    if (*k1 > *k2) return 1;
+    return 0;
+}
+
+// Helper comparison function for pointer keys
+int hashmap_ptr_compare(const void *key1, const void *key2) {
+    if (key1 < key2) return -1;
+    if (key1 > key2) return 1;
+    return 0;
 }
 
 // Create a new hashmap
@@ -60,10 +96,17 @@ hashmap_t *hashmap_create(
         return NULL;
     }
 
+    // Validate required functions
+    if (!hash_func || !key_compare) {
+        free(map->buckets);
+        free(map);
+        return NULL;
+    }
+
     map->capacity = initial_capacity;
     map->size = 0;
-    map->hash_func = hash_func ? hash_func : hashmap_default_hash;
-    map->key_compare = key_compare ? key_compare : hashmap_default_key_compare;
+    map->hash_func = hash_func;
+    map->key_compare = key_compare;
     map->key_free = key_free;
     map->value_free = value_free;
 

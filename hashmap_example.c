@@ -4,12 +4,12 @@
 #include <string.h>
 #include "hashmap.h"
 
-// Example 1: Using string keys (default hash and compare functions)
+// Example 1: Using string keys (using helper functions)
 void example_string_keys() {
     printf("=== Example 1: String Keys ===\n");
     
-    // Create hashmap with default string hash/compare functions
-    hashmap_t *map = hashmap_create(16, NULL, NULL, NULL, NULL);
+    // Create hashmap with string hash/compare helper functions
+    hashmap_t *map = hashmap_create(16, hashmap_string_hash, hashmap_string_compare, NULL, NULL);
     
     // Insert some key-value pairs
     hashmap_put(map, "apple", "red");
@@ -42,24 +42,11 @@ void example_string_keys() {
 }
 
 // Example 2: Using integer keys
-size_t int_hash(const void *key) {
-    int *k = (int *)key;
-    return (size_t)(*k);
-}
-
-int int_compare(const void *key1, const void *key2) {
-    int *k1 = (int *)key1;
-    int *k2 = (int *)key2;
-    if (*k1 < *k2) return -1;
-    if (*k1 > *k2) return 1;
-    return 0;
-}
-
 void example_int_keys() {
     printf("=== Example 2: Integer Keys ===\n");
     
-    // Create hashmap with custom int hash/compare functions
-    hashmap_t *map = hashmap_create(16, int_hash, int_compare, NULL, NULL);
+    // Create hashmap with integer hash/compare helper functions
+    hashmap_t *map = hashmap_create(16, hashmap_int_hash, hashmap_int_compare, NULL, NULL);
     
     // Allocate keys and values
     int *key1 = malloc(sizeof(int));
@@ -104,8 +91,8 @@ void example_int_keys() {
 void example_with_cleanup() {
     printf("=== Example 3: With Memory Cleanup ===\n");
     
-    // Create hashmap with cleanup functions
-    hashmap_t *map = hashmap_create(16, NULL, NULL, free, free);
+    // Create hashmap with string helpers and cleanup functions
+    hashmap_t *map = hashmap_create(16, hashmap_string_hash, hashmap_string_compare, free, free);
     
     // Insert dynamically allocated strings
     char *key1 = strdup("name");

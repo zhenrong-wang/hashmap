@@ -15,10 +15,11 @@ typedef void (*value_free_func_t)(void *value);
 
 // Create a new hashmap
 // initial_capacity: initial number of buckets (must be > 0)
-// hash_func: function to hash keys (NULL for default string hash)
-// key_compare: function to compare keys (NULL for default string compare)
+// hash_func: function to hash keys (REQUIRED - cannot be NULL)
+// key_compare: function to compare keys (REQUIRED - cannot be NULL)
 // key_free: function to free keys (NULL for no cleanup)
 // value_free: function to free values (NULL for no cleanup)
+// Returns NULL on failure
 hashmap_t *hashmap_create(
     size_t initial_capacity,
     hash_func_t hash_func,
@@ -54,11 +55,31 @@ bool hashmap_is_empty(const hashmap_t *map);
 // Clear all entries from the hashmap
 void hashmap_clear(hashmap_t *map);
 
-// Default hash function for strings
-size_t hashmap_default_hash(const void *key);
+// Helper hash functions for common key types
 
-// Default key comparison function for strings
-int hashmap_default_key_compare(const void *key1, const void *key2);
+// Hash function for null-terminated C strings
+size_t hashmap_string_hash(const void *key);
+
+// Hash function for integer keys (pass pointer to int)
+size_t hashmap_int_hash(const void *key);
+
+// Hash function for pointer keys (uses pointer address)
+size_t hashmap_ptr_hash(const void *key);
+
+// Hash function for binary data (requires key_size parameter)
+// Note: This is a helper - you need to create a wrapper that captures key_size
+// Example: Use hashmap_binary_hash_with_size(key_size) to get a hash function
+
+// Helper comparison functions for common key types
+
+// Comparison function for null-terminated C strings
+int hashmap_string_compare(const void *key1, const void *key2);
+
+// Comparison function for integer keys (pass pointers to int)
+int hashmap_int_compare(const void *key1, const void *key2);
+
+// Comparison function for pointer keys (compares pointer addresses)
+int hashmap_ptr_compare(const void *key1, const void *key2);
 
 #endif // HASHMAP_H
 
