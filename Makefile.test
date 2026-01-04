@@ -1,0 +1,24 @@
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11 -g -O2
+TARGET = test_hashmap
+OBJS = hashmap.o test_hashmap.o
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+
+hashmap.o: hashmap.c hashmap.h
+	$(CC) $(CFLAGS) -c hashmap.c
+
+test_hashmap.o: test_hashmap.c hashmap.h
+	$(CC) $(CFLAGS) -c test_hashmap.c
+
+clean:
+	rm -f $(TARGET) $(OBJS)
+
+test: $(TARGET)
+	./$(TARGET)
+
+.PHONY: all clean test
+

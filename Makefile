@@ -17,5 +17,8 @@ hashmap_example.o: hashmap_example.c hashmap.h
 clean:
 	rm -f $(TARGET) $(OBJS)
 
-.PHONY: all clean
+test:
+	$(MAKE) -f Makefile.test test
+
+.PHONY: all clean test
 
