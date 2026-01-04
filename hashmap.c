@@ -5,7 +5,8 @@
 
 // Hashmap entry structure
 typedef struct entry {
-    void *key;
+    void *key;          // Copied key data
+    size_t key_size;    // Size of key in bytes
     void *value;
     struct entry *next;  // For chaining
 } entry_t;
@@ -15,28 +16,9 @@ struct hashmap {
     entry_t **buckets;
     size_t capacity;
     size_t size;
-    size_t key_size;  // 0 means using custom functions, >0 means using generic byte-wise functions
-    hash_func_t hash_func;
-    key_compare_func_t key_compare;
-    key_free_func_t key_free;
+    key_free_func_t key_free;      // Not used (keys are always copied and freed internally)
     value_free_func_t value_free;
 };
-
-// Helper hash function for null-terminated C strings (djb2 algorithm)
-size_t hashmap_string_hash(const void *key) {
-    const char *str = (const char *)key;
-    size_t hash = 5381;
-    int c;
-    while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
-    }
-    return hash;
-}
-
-// Helper comparison function for null-terminated C strings
-int hashmap_string_compare(const void *key1, const void *key2) {
-    return strcmp((const char *)key1, (const char *)key2);
-}
 
 // Generic byte-wise hash function (FNV-1a algorithm)
 static size_t generic_hash(const void *key, size_t key_size) {
@@ -59,8 +41,6 @@ static int generic_compare(const void *key1, const void *key2, size_t key_size) 
 // Create a new hashmap
 hashmap_t *hashmap_create(
     size_t initial_capacity,
-    hash_func_t hash_func,
-    key_compare_func_t key_compare,
     key_free_func_t key_free,
     value_free_func_t value_free
 ) {
@@ -79,56 +59,9 @@ hashmap_t *hashmap_create(
         return NULL;
     }
 
-    // Validate required functions
-    if (!hash_func || !key_compare) {
-        free(map->buckets);
-        free(map);
-        return NULL;
-    }
-
     map->capacity = initial_capacity;
     map->size = 0;
-    map->key_size = 0;  // 0 means using custom functions
-    map->hash_func = hash_func;
-    map->key_compare = key_compare;
-    map->key_free = key_free;
-    map->value_free = value_free;
-
-    return map;
-}
-
-// Create a new hashmap with generic byte-wise hashing and comparison
-hashmap_t *hashmap_create_with_key_size(
-    size_t initial_capacity,
-    size_t key_size,
-    key_free_func_t key_free,
-    value_free_func_t value_free
-) {
-    if (initial_capacity == 0) {
-        initial_capacity = 16; // Default capacity
-    }
-    
-    if (key_size == 0) {
-        return NULL;  // key_size must be > 0
-    }
-
-    hashmap_t *map = (hashmap_t *)malloc(sizeof(hashmap_t));
-    if (!map) {
-        return NULL;
-    }
-
-    map->buckets = (entry_t **)calloc(initial_capacity, sizeof(entry_t *));
-    if (!map->buckets) {
-        free(map);
-        return NULL;
-    }
-
-    map->capacity = initial_capacity;
-    map->size = 0;
-    map->key_size = key_size;  // >0 means using generic byte-wise functions
-    map->hash_func = NULL;  // Not used when key_size > 0
-    map->key_compare = NULL;  // Not used when key_size > 0
-    map->key_free = key_free;
+    map->key_free = key_free;  // Not used, but kept for API compatibility
     map->value_free = value_free;
 
     return map;
@@ -156,9 +89,10 @@ void hashmap_clear(hashmap_t *map) {
         while (entry) {
             entry_t *next = entry->next;
             
-            if (map->key_free) {
-                map->key_free(entry->key);
-            }
+            // Free the copied key
+            free(entry->key);
+            
+            // Free value if needed
             if (map->value_free) {
                 map->value_free(entry->value);
             }
@@ -185,10 +119,8 @@ static bool hashmap_resize(hashmap_t *map, size_t new_capacity) {
         while (entry) {
             entry_t *next = entry->next;
             
-            // Calculate new bucket index
-            size_t hash = map->key_size > 0 
-                ? generic_hash(entry->key, map->key_size)
-                : map->hash_func(entry->key);
+            // Calculate new bucket index using stored key_size
+            size_t hash = generic_hash(entry->key, entry->key_size);
             size_t new_index = hash % new_capacity;
             
             // Insert into new bucket
@@ -207,8 +139,8 @@ static bool hashmap_resize(hashmap_t *map, size_t new_capacity) {
 }
 
 // Insert or update a key-value pair
-bool hashmap_put(hashmap_t *map, void *key, void *value) {
-    if (!map || !key) {
+bool hashmap_put(hashmap_t *map, const void *key, size_t key_size, void *value) {
+    if (!map || !key || key_size == 0) {
         return false;
     }
 
@@ -219,18 +151,14 @@ bool hashmap_put(hashmap_t *map, void *key, void *value) {
         }
     }
 
-    size_t hash = map->key_size > 0 
-        ? generic_hash(key, map->key_size)
-        : map->hash_func(key);
+    size_t hash = generic_hash(key, key_size);
     size_t index = hash % map->capacity;
 
     // Check if key already exists
     entry_t *entry = map->buckets[index];
     while (entry) {
-        int cmp_result = map->key_size > 0
-            ? generic_compare(entry->key, key, map->key_size)
-            : map->key_compare(entry->key, key);
-        if (cmp_result == 0) {
+        if (entry->key_size == key_size && 
+            generic_compare(entry->key, key, key_size) == 0) {
             // Update existing entry
             if (map->value_free && entry->value != value) {
                 map->value_free(entry->value);
@@ -241,13 +169,19 @@ bool hashmap_put(hashmap_t *map, void *key, void *value) {
         entry = entry->next;
     }
 
-    // Create new entry
+    // Create new entry and copy the key
     entry = (entry_t *)malloc(sizeof(entry_t));
     if (!entry) {
         return false;
     }
 
-    entry->key = key;
+    entry->key = malloc(key_size);
+    if (!entry->key) {
+        free(entry);
+        return false;
+    }
+    memcpy(entry->key, key, key_size);
+    entry->key_size = key_size;
     entry->value = value;
     entry->next = map->buckets[index];
     map->buckets[index] = entry;
@@ -257,22 +191,18 @@ bool hashmap_put(hashmap_t *map, void *key, void *value) {
 }
 
 // Get the value associated with a key
-void *hashmap_get(const hashmap_t *map, const void *key) {
-    if (!map || !key) {
+void *hashmap_get(const hashmap_t *map, const void *key, size_t key_size) {
+    if (!map || !key || key_size == 0) {
         return NULL;
     }
 
-    size_t hash = map->key_size > 0 
-        ? generic_hash(key, map->key_size)
-        : map->hash_func(key);
+    size_t hash = generic_hash(key, key_size);
     size_t index = hash % map->capacity;
 
     entry_t *entry = map->buckets[index];
     while (entry) {
-        int cmp_result = map->key_size > 0
-            ? generic_compare(entry->key, key, map->key_size)
-            : map->key_compare(entry->key, key);
-        if (cmp_result == 0) {
+        if (entry->key_size == key_size && 
+            generic_compare(entry->key, key, key_size) == 0) {
             return entry->value;
         }
         entry = entry->next;
@@ -282,24 +212,20 @@ void *hashmap_get(const hashmap_t *map, const void *key) {
 }
 
 // Remove a key-value pair
-bool hashmap_remove(hashmap_t *map, const void *key) {
-    if (!map || !key) {
+bool hashmap_remove(hashmap_t *map, const void *key, size_t key_size) {
+    if (!map || !key || key_size == 0) {
         return false;
     }
 
-    size_t hash = map->key_size > 0 
-        ? generic_hash(key, map->key_size)
-        : map->hash_func(key);
+    size_t hash = generic_hash(key, key_size);
     size_t index = hash % map->capacity;
 
     entry_t *entry = map->buckets[index];
     entry_t *prev = NULL;
 
     while (entry) {
-        int cmp_result = map->key_size > 0
-            ? generic_compare(entry->key, key, map->key_size)
-            : map->key_compare(entry->key, key);
-        if (cmp_result == 0) {
+        if (entry->key_size == key_size && 
+            generic_compare(entry->key, key, key_size) == 0) {
             // Remove entry from chain
             if (prev) {
                 prev->next = entry->next;
@@ -307,10 +233,10 @@ bool hashmap_remove(hashmap_t *map, const void *key) {
                 map->buckets[index] = entry->next;
             }
 
-            // Free key and value if needed
-            if (map->key_free) {
-                map->key_free(entry->key);
-            }
+            // Free the copied key
+            free(entry->key);
+            
+            // Free value if needed
             if (map->value_free) {
                 map->value_free(entry->value);
             }
@@ -327,8 +253,8 @@ bool hashmap_remove(hashmap_t *map, const void *key) {
 }
 
 // Check if a key exists in the hashmap
-bool hashmap_contains(const hashmap_t *map, const void *key) {
-    return hashmap_get(map, key) != NULL;
+bool hashmap_contains(const hashmap_t *map, const void *key, size_t key_size) {
+    return hashmap_get(map, key, key_size) != NULL;
 }
 
 // Get the number of key-value pairs in the hashmap

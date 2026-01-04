@@ -1,17 +1,15 @@
 # Simple Hashmap Implementation in C
 
-A simple hashmap implementation in C that mimics the functionality of `std::map` or `std::unordered_map` from C++.
+A simple, truly generic hashmap implementation in C that mimics the functionality of `std::unordered_map` from C++.
 
 ## Features
 
-- **Generic key-value storage**: Works with any pointer type (keys can be binary data, not just strings)
-- **Two creation modes**:
-  - Custom hash/compare functions (full control)
-  - Generic key-size mode (no custom functions needed for fixed-size types!)
-- **Helper functions provided**: For strings, integers, and pointers
+- **Truly generic**: Works with any byte block as keys (int, strings, structs, binary data)
+- **Simple API**: No need for custom hash/compare functions - just provide key size
 - **Automatic resizing**: Grows when load factor exceeds 0.75
 - **Collision handling**: Uses separate chaining
-- **Memory management**: Optional cleanup functions for keys and values
+- **Memory management**: Optional cleanup functions for values
+- **Safe**: Keys are always copied internally (no dangling pointer issues)
 - **Standard operations**: put, get, remove, contains, size, clear
 
 ## API
@@ -20,54 +18,20 @@ A simple hashmap implementation in C that mimics the functionality of `std::map`
 
 ```c
 hashmap_t *hashmap_create(
-    size_t initial_capacity,
-    hash_func_t hash_func,        // REQUIRED - function to hash keys
-    key_compare_func_t key_compare, // REQUIRED - function to compare keys
-    key_free_func_t key_free,      // NULL for no cleanup
+    size_t initial_capacity,  // Initial number of buckets (0 defaults to 16)
+    key_free_func_t key_free,      // NULL (keys are always copied internally)
     value_free_func_t value_free   // NULL for no cleanup
 );
 ```
 
-**Note**: `hash_func` and `key_compare` are **required** and cannot be NULL when using `hashmap_create()`. This ensures the hashmap works correctly with any key type, including binary data. 
-
-**Alternative**: For fixed-size key types (int, structs, binary data), you can use `hashmap_create_with_key_size()` instead - no custom functions needed!
-
-### Generic Key-Size Mode (Recommended for Fixed-Size Types)
-
-For fixed-size key types (integers, structs, binary data), you can use `hashmap_create_with_key_size()` which automatically handles hashing and comparison using byte-wise operations. **No custom functions needed!**
-
-```c
-hashmap_t *hashmap_create_with_key_size(
-    size_t initial_capacity,
-    size_t key_size,        // Size of key in bytes (e.g., sizeof(int), sizeof(my_struct))
-    key_free_func_t key_free,
-    value_free_func_t value_free
-);
-```
-
-This uses the FNV-1a hash algorithm and `memcmp` for comparison, making it perfect for:
-- Integers (`sizeof(int)`)
-- Structs (`sizeof(my_struct)`)
-- Fixed-size binary data
-- Any type where keys have a fixed size
-
-### Helper Functions
-
-**Only for variable-length keys**: The library provides helper functions for null-terminated C strings:
-
-- `hashmap_string_hash()` - Hash function for strings
-- `hashmap_string_compare()` - Comparison function for strings
-
-**Why only strings?** The generic `hashmap_create_with_key_size()` method handles all fixed-size types (int, structs, pointers, binary data). Strings are special because they're variable-length (null-terminated), so they need special handling.
-
-For custom types with special requirements, you can provide your own hash and comparison functions using `hashmap_create()`.
+**Note**: Keys are always copied and stored with their sizes internally. You don't need to provide hash or comparison functions - the library handles everything generically using byte-wise hashing and comparison.
 
 ### Operations
 
-- `bool hashmap_put(hashmap_t *map, void *key, void *value)` - Insert or update
-- `void *hashmap_get(const hashmap_t *map, const void *key)` - Get value
-- `bool hashmap_remove(hashmap_t *map, const void *key)` - Remove entry
-- `bool hashmap_contains(const hashmap_t *map, const void *key)` - Check existence
+- `bool hashmap_put(hashmap_t *map, const void *key, size_t key_size, void *value)` - Insert or update
+- `void *hashmap_get(const hashmap_t *map, const void *key, size_t key_size)` - Get value
+- `bool hashmap_remove(hashmap_t *map, const void *key, size_t key_size)` - Remove entry
+- `bool hashmap_contains(const hashmap_t *map, const void *key, size_t key_size)` - Check existence
 - `size_t hashmap_size(const hashmap_t *map)` - Get size
 - `bool hashmap_is_empty(const hashmap_t *map)` - Check if empty
 - `void hashmap_clear(hashmap_t *map)` - Clear all entries
@@ -87,98 +51,109 @@ make
 
 ## Usage Examples
 
-### Generic Key-Size Mode (Easiest for Fixed-Size Types!)
-
-```c
-// For integers - no custom functions needed!
-hashmap_t *map = hashmap_create_with_key_size(16, sizeof(int), NULL, NULL);
-int key = 42;
-int value = 100;
-hashmap_put(map, &key, &value);
-int *result = (int *)hashmap_get(map, &key);
-hashmap_destroy(map);
-
-// For structs - also no custom functions needed!
-typedef struct { int x; int y; } point_t;
-hashmap_t *point_map = hashmap_create_with_key_size(16, sizeof(point_t), NULL, NULL);
-point_t p = {1, 2};
-hashmap_put(point_map, &p, "origin");
-char *label = (char *)hashmap_get(point_map, &p);
-hashmap_destroy(point_map);
-```
-
-### String Keys (Using Helper Functions)
-
-```c
-hashmap_t *map = hashmap_create(16, hashmap_string_hash, hashmap_string_compare, NULL, NULL);
-hashmap_put(map, "key1", "value1");
-char *value = (char *)hashmap_get(map, "key1");
-hashmap_destroy(map);
-```
-
 ### Integer Keys
 
-**Use the generic method** - no helper functions needed:
-
 ```c
-hashmap_t *map = hashmap_create_with_key_size(16, sizeof(int), NULL, NULL);
+hashmap_t *map = hashmap_create(16, NULL, NULL);
 int key = 42;
 int value = 100;
-hashmap_put(map, &key, &value);
-int *result = (int *)hashmap_get(map, &key);
+hashmap_put(map, &key, sizeof(int), &value);
+int *result = (int *)hashmap_get(map, &key, sizeof(int));
 hashmap_destroy(map);
 ```
 
-### With Automatic Memory Cleanup
+### String Keys
 
 ```c
-hashmap_t *map = hashmap_create(16, hashmap_string_hash, hashmap_string_compare, free, free);
-char *key = strdup("name");
-char *val = strdup("John");
-hashmap_put(map, key, val);
-// hashmap_destroy will automatically free keys and values
+hashmap_t *map = hashmap_create(16, NULL, NULL);
+hashmap_put(map, "apple", strlen("apple") + 1, "red");
+char *value = (char *)hashmap_get(map, "apple", strlen("apple") + 1);
 hashmap_destroy(map);
 ```
 
-### Binary Data Keys
-
-For fixed-size binary data, use `hashmap_create_with_key_size()`:
+### Struct Keys
 
 ```c
-// For 16-byte binary keys - no custom functions needed!
-hashmap_t *map = hashmap_create_with_key_size(16, 16, NULL, NULL);
-uint8_t key[16] = {0x01, 0x02, ...};
-hashmap_put(map, key, value);
+typedef struct { int x; int y; } point_t;
+hashmap_t *map = hashmap_create(16, NULL, NULL);
+point_t p = {1, 2};
+hashmap_put(map, &p, sizeof(point_t), "origin");
+char *label = (char *)hashmap_get(map, &p, sizeof(point_t));
 hashmap_destroy(map);
 ```
 
-For variable-length binary data or special requirements, provide custom functions:
+### Variable-Length Binary Data
 
 ```c
-// Custom hash function for variable-length binary data
-size_t binary_hash(const void *key) {
-    const uint8_t *data = (const uint8_t *)key;
-    size_t hash = 5381;
-    // Hash first 16 bytes (adjust as needed)
-    for (int i = 0; i < 16; i++) {
-        hash = ((hash << 5) + hash) + data[i];
-    }
-    return hash;
-}
+hashmap_t *map = hashmap_create(16, NULL, NULL);
+uint8_t key1[] = {0x01, 0x02, 0x03};
+uint8_t key2[] = {0x04, 0x05, 0x06, 0x07, 0x08};  // Different length!
 
-int binary_compare(const void *key1, const void *key2) {
-    return memcmp(key1, key2, 16); // Compare first 16 bytes
-}
+hashmap_put(map, key1, sizeof(key1), "value1");
+hashmap_put(map, key2, sizeof(key2), "value2");
 
-hashmap_t *map = hashmap_create(16, binary_hash, binary_compare, NULL, NULL);
+char *result = (char *)hashmap_get(map, key1, sizeof(key1));
+hashmap_destroy(map);
 ```
+
+### With Memory Cleanup
+
+```c
+hashmap_t *map = hashmap_create(16, NULL, free);  // free values on destroy
+
+char *val1 = strdup("John");
+char *val2 = strdup("Jane");
+
+hashmap_put(map, "name1", strlen("name1") + 1, val1);
+hashmap_put(map, "name2", strlen("name2") + 1, val2);
+
+// hashmap_destroy will automatically free all values
+hashmap_destroy(map);
+```
+
+## How It Works
+
+The hashmap uses a **truly generic approach**:
+
+1. **Keys are always copied**: When you call `hashmap_put()`, the key data is copied and stored with its size
+2. **Byte-wise hashing**: Uses FNV-1a hash algorithm on the raw bytes
+3. **Byte-wise comparison**: Uses `memcmp()` for comparison
+4. **No type assumptions**: Works with any byte pattern, any length (even with null bytes!)
+
+This is similar to how C++ `std::unordered_map<std::vector<uint8_t>, V>` works - the container knows the size of each key and handles everything generically.
+
+## Comparison with C++
+
+In C++, `std::unordered_map` uses templates and compile-time type information. For example:
+- `std::unordered_map<int, V>` - compiler knows `int` size
+- `std::unordered_map<std::string, V>` - `std::string` knows its own size
+- `std::unordered_map<std::vector<uint8_t>, V>` - `std::vector` knows its size
+
+In C, we achieve similar genericity by:
+- Requiring `key_size` parameter at runtime (instead of compile-time type info)
+- Copying keys and storing sizes (like `std::vector<uint8_t>` does)
+- Using byte-wise hashing/comparison (works for any type)
 
 ## Implementation Details
 
 - Uses separate chaining for collision resolution
 - Default capacity: 16 buckets
 - Resizes when load factor > 0.75 (doubles capacity)
-- Hash and comparison functions are **required** - no default assumptions about key format
-- Helper functions provided for strings (djb2 hash), integers, and pointers
-- Supports any key type including binary data - just provide appropriate hash/compare functions
+- Hash algorithm: FNV-1a
+- Keys are always copied (safe, but uses more memory)
+- No hash/compare functions needed - everything is generic!
 
+## Trade-offs
+
+**Pros:**
+- ✅ Truly generic - works with any byte block
+- ✅ Simple API - no custom functions needed
+- ✅ Safe - keys are copied (no dangling pointers)
+- ✅ Consistent - same API for all key types
+
+**Cons:**
+- ⚠️ Always copies keys (memory overhead)
+- ⚠️ Requires `key_size` parameter at each operation
+- ⚠️ Slightly more memory per entry (stores key_size)
+
+For most use cases, the simplicity and safety outweigh the memory overhead.
